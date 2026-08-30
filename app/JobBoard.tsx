@@ -2,13 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "./components/SiteHeader";
-import {
-  JOBS_STORAGE_KEY,
-  Job,
-  JobFilters,
-  filterJobs,
-  loadJobs,
-} from "./data/jobs";
+import { Job, JobFilters, filterJobs } from "./data/jobs";
 
 type JobBoardProps = {
   initialJobs: Job[];
@@ -23,10 +17,20 @@ export function JobBoard({ initialJobs, initialFilters }: JobBoardProps) {
   const [type, setType] = useState(initialFilters.type);
   const [salaryFrom, setSalaryFrom] = useState(initialFilters.salaryFrom);
   const [salaryTo, setSalaryTo] = useState(initialFilters.salaryTo);
-  const [urlReady, setUrlReady] = useState(false);
 
   useEffect(() => {
-    setJobs(loadJobs());
+    let isCurrent = true;
+    fetch("/api/jobs", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Unable to refresh jobs.");
+        return response.json() as Promise<Job[]>;
+      })
+      .then((nextJobs) => {
+        if (isCurrent) setJobs(nextJobs);
+      })
+      .catch(() => {
+        // Keep the server-rendered results if a background refresh fails.
+      });
 
     const syncFiltersFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
@@ -38,24 +42,14 @@ export function JobBoard({ initialJobs, initialFilters }: JobBoardProps) {
       setType(params.get("type") ?? "All types");
     };
 
-    syncFiltersFromUrl();
-    setUrlReady(true);
-
-    const syncJobs = (event: StorageEvent) => {
-      if (event.key === JOBS_STORAGE_KEY) setJobs(loadJobs());
-    };
-
-    window.addEventListener("storage", syncJobs);
     window.addEventListener("popstate", syncFiltersFromUrl);
     return () => {
-      window.removeEventListener("storage", syncJobs);
+      isCurrent = false;
       window.removeEventListener("popstate", syncFiltersFromUrl);
     };
   }, []);
 
   useEffect(() => {
-    if (!urlReady) return;
-
     const params = new URLSearchParams(window.location.search);
     const syncParam = (key: string, value: string, emptyValue?: string) => {
       if (!value || value === emptyValue) params.delete(key);
@@ -72,7 +66,7 @@ export function JobBoard({ initialJobs, initialFilters }: JobBoardProps) {
     const queryString = params.toString();
     const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
     window.history.replaceState(null, "", nextUrl);
-  }, [location, query, role, salaryFrom, salaryTo, type, urlReady]);
+  }, [location, query, role, salaryFrom, salaryTo, type]);
 
   const locations = useMemo(
     () => [

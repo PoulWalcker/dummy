@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { JobBoard } from "./JobBoard";
-import { DEFAULT_JOBS, EMPTY_JOB_FILTERS, JobFilters, filterJobs } from "./data/jobs";
+import { EMPTY_JOB_FILTERS, JobFilters, filterJobs } from "./data/jobs";
+import { getJobs } from "./data/jobs.server";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "SHADY JOBS DOT COM",
@@ -16,7 +19,7 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const params = await searchParams;
+  const [params, jobs] = await Promise.all([searchParams, getJobs()]);
   const initialFilters: JobFilters = {
     query: firstParam(params.q),
     salaryFrom: firstParam(params.salary_from),
@@ -28,7 +31,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <JobBoard
-      initialJobs={filterJobs(DEFAULT_JOBS, initialFilters)}
+      initialJobs={filterJobs(jobs, initialFilters)}
       initialFilters={initialFilters}
     />
   );

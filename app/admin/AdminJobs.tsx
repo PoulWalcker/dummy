@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { SiteHeader } from "../components/SiteHeader";
-import { DEFAULT_JOBS, Job, loadJobs, saveJobs } from "../data/jobs";
+import { Job } from "../data/jobs";
 
 type JobDraft = Omit<Job, "id">;
 
@@ -15,17 +16,19 @@ const EMPTY_DRAFT: JobDraft = {
   description: "",
 };
 
-export function AdminJobs() {
-  const [jobs, setJobs] = useState<Job[]>(DEFAULT_JOBS);
+type AdminJobsProps = {
+  initialJobs: Job[];
+};
+
+export function AdminJobs({ initialJobs }: AdminJobsProps) {
+  const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [draft, setDraft] = useState<JobDraft>(EMPTY_DRAFT);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
-
-  useEffect(() => setJobs(loadJobs()), []);
+  const [isSaving, setIsSaving] = useState(false);
 
   function updateJobs(nextJobs: Job[], message: string) {
     setJobs(nextJobs);
-    saveJobs(nextJobs);
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2600);
   }
@@ -39,26 +42,37 @@ export function AdminJobs() {
     setEditingId(null);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanDraft = Object.fromEntries(
       Object.entries(draft).map(([key, value]) => [key, value.trim()]),
     ) as JobDraft;
 
-    if (editingId) {
-      updateJobs(
-        jobs.map((job) => (job.id === editingId ? { ...cleanDraft, id: editingId } : job)),
-        "Job updated successfully.",
-      );
-    } else {
-      const newJob: Job = {
-        ...cleanDraft,
-        id: `${Date.now()}-${cleanDraft.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`,
-      };
-      updateJobs([newJob, ...jobs], "Job created successfully.");
-    }
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/jobs", {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingId ? { ...cleanDraft, id: editingId } : cleanDraft),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to save the job.");
 
-    resetForm();
+      const savedJob = result as Job;
+      if (editingId) {
+        updateJobs(
+          jobs.map((job) => (job.id === editingId ? savedJob : job)),
+          "Job updated successfully.",
+        );
+      } else {
+        updateJobs([...jobs, savedJob], "Job created successfully.");
+      }
+      resetForm();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to save the job.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function startEditing(job: Job) {
@@ -68,10 +82,25 @@ export function AdminJobs() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function deleteJob(job: Job) {
+  async function deleteJob(job: Job) {
     if (!window.confirm(`Delete “${job.title}” at ${job.company}?`)) return;
-    updateJobs(jobs.filter((item) => item.id !== job.id), "Job deleted.");
-    if (editingId === job.id) resetForm();
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: job.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to delete the job.");
+
+      updateJobs(jobs.filter((item) => item.id !== job.id), "Job deleted.");
+      if (editingId === job.id) resetForm();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to delete the job.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -87,7 +116,7 @@ export function AdminJobs() {
             <h1>Run the shady operation</h1>
             <p>Publish respectable opportunities from a delightfully suspicious control room.</p>
           </div>
-          <a className="view-site-link" href="/">View public board <span aria-hidden="true">↗</span></a>
+          <Link className="view-site-link" href="/">View public board <span aria-hidden="true">↗</span></Link>
         </div>
 
         <div className="admin-layout">
@@ -142,8 +171,8 @@ export function AdminJobs() {
                 <textarea id="description" required maxLength={240} rows={5} placeholder="Describe the role and what makes it meaningful..." value={draft.description} onChange={(event) => updateDraft("description", event.target.value)} />
               </div>
 
-              <button className="button submit-button" type="submit">
-                {editingId ? "Save the evidence" : "Publish this job"}
+              <button className="button submit-button" type="submit" disabled={isSaving}>
+                {isSaving ? "Saving…" : editingId ? "Save the evidence" : "Publish this job"}
               </button>
               {editingId && <button className="text-button cancel-button" type="button" onClick={resetForm}>Cancel editing</button>}
             </form>
@@ -169,8 +198,8 @@ export function AdminJobs() {
                       <span>{job.salary}</span>
                     </div>
                     <div className="row-actions">
-                      <button type="button" className="icon-button" onClick={() => startEditing(job)} aria-label={`Edit ${job.title}`}>Edit</button>
-                      <button type="button" className="icon-button danger" onClick={() => deleteJob(job)} aria-label={`Delete ${job.title}`}>Delete</button>
+                      <button type="button" className="icon-button" disabled={isSaving} onClick={() => startEditing(job)} aria-label={`Edit ${job.title}`}>Edit</button>
+                      <button type="button" className="icon-button danger" disabled={isSaving} onClick={() => deleteJob(job)} aria-label={`Delete ${job.title}`}>Delete</button>
                     </div>
                   </article>
                 ))}
@@ -185,7 +214,7 @@ export function AdminJobs() {
           </section>
         </div>
 
-        <p className="storage-note">Your operation is saved in this browser. No offshore server required.</p>
+        <p className="storage-note">Your operation is saved to the shared database. Every device—and every crawler—sees the same evidence.</p>
       </div>
     </main>
   );

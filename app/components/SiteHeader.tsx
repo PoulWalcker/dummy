@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 type SiteHeaderProps = {
   active: "jobs" | "admin";
 };
@@ -5,21 +7,21 @@ type SiteHeaderProps = {
 export function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="site-header">
-      <a className="brand" href="/" aria-label="Shady Jobs Dot Com home">
+      <Link className="brand" href="/" aria-label="Shady Jobs Dot Com home">
         <span className="brand-mark">SJ</span>
         <span>SHADY JOBS <em>DOT COM</em></span>
-      </a>
+      </Link>
       <nav aria-label="Main navigation">
-        <a className={`nav-link ${active === "jobs" ? "active" : ""}`} href="/">
+        <Link className={`nav-link ${active === "jobs" ? "active" : ""}`} href="/">
           Find jobs
-        </a>
-        <a
+        </Link>
+        <Link
           className={active === "admin" ? "button button-small" : "button button-small"}
           href="/admin"
           aria-current={active === "admin" ? "page" : undefined}
         >
           Manage jobs
-        </a>
+        </Link>
       </nav>
     </header>
   );

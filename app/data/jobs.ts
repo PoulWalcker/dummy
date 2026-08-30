@@ -26,19 +26,6 @@ export const EMPTY_JOB_FILTERS: JobFilters = {
   type: "All types",
 };
 
-export const JOBS_STORAGE_KEY = "workly-jobs";
-const SEED_VERSION_KEY = "shady-jobs-seed-version";
-const CURRENT_SEED_VERSION = "2";
-
-const LEGACY_SEED_IDS = new Set([
-  "product-designer",
-  "frontend-engineer",
-  "customer-success",
-  "content-strategist",
-  "data-analyst",
-  "marketing-intern",
-]);
-
 export const DEFAULT_JOBS: Job[] = [
   {
     id: "hustle-operations-lead",
@@ -121,44 +108,6 @@ export const DEFAULT_JOBS: Job[] = [
       "Host workshops, invent three-by-three matrices, and leave before anyone requests measurable outcomes.",
   },
 ];
-
-export function loadJobs(): Job[] {
-  if (typeof window === "undefined") return DEFAULT_JOBS;
-
-  try {
-    const stored = window.localStorage.getItem(JOBS_STORAGE_KEY);
-    if (!stored) {
-      window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(DEFAULT_JOBS));
-      window.localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
-      return DEFAULT_JOBS;
-    }
-
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return DEFAULT_JOBS;
-
-    if (window.localStorage.getItem(SEED_VERSION_KEY) !== CURRENT_SEED_VERSION) {
-      const containsOnlyOriginalSamples = parsed.every((job: Job) => LEGACY_SEED_IDS.has(job.id));
-      const nextJobs = containsOnlyOriginalSamples
-        ? DEFAULT_JOBS
-        : [
-            ...parsed,
-            ...DEFAULT_JOBS.filter((sample) => !parsed.some((job: Job) => job.id === sample.id)),
-          ];
-
-      window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(nextJobs));
-      window.localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION);
-      return nextJobs;
-    }
-
-    return parsed;
-  } catch {
-    return DEFAULT_JOBS;
-  }
-}
-
-export function saveJobs(jobs: Job[]) {
-  window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
-}
 
 export function filterJobs(jobs: Job[], filters: JobFilters): Job[] {
   const normalizedQuery = filters.query.trim().toLowerCase();

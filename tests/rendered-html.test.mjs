@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
+import {
+  DEFAULT_JOBS,
+  EMPTY_JOB_FILTERS,
+  filterJobs,
+} from "../app/data/jobs.ts";
+
 const readProjectFile = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("contains the public Shady Jobs experience", async () => {
@@ -29,10 +35,46 @@ test("keeps all filters synchronized with query parameters", async () => {
     assert.match(board, new RegExp(`syncParam\\(\\"${parameter}\\"`));
   }
   assert.match(board, /window\.history\.replaceState/);
-  assert.match(page, /await searchParams/);
-  assert.match(page, /filterJobs\(DEFAULT_JOBS, initialFilters\)/);
+  assert.match(page, /Promise\.all\(\[searchParams, getJobs\(\)\]\)/);
+  assert.match(page, /initialJobs=\{filterJobs\(jobs, initialFilters\)\}/);
   assert.match(page, /params\.salary_from/);
   assert.match(page, /params\.salary_to/);
+});
+
+test("filters jobs by the shared URL fields", () => {
+  const matching = filterJobs(DEFAULT_JOBS, {
+    ...EMPTY_JOB_FILTERS,
+    location: "Remote",
+    role: "NFT Enterprise Sales Executive",
+    type: "Full-time",
+  });
+  const mismatching = filterJobs(DEFAULT_JOBS, {
+    ...EMPTY_JOB_FILTERS,
+    location: "Remote",
+    role: "NFT Enterprise Sales Executive",
+    type: "Internship",
+  });
+
+  assert.deepEqual(matching.map((job) => job.id), ["nft-enterprise-sales"]);
+  assert.equal(mismatching.length, 0);
+});
+
+test("uses the shared database instead of browser storage", async () => {
+  const [board, admin, serverJobs, api] = await Promise.all([
+    readProjectFile("app/JobBoard.tsx"),
+    readProjectFile("app/admin/AdminJobs.tsx"),
+    readProjectFile("app/data/jobs.server.ts"),
+    readProjectFile("app/api/jobs/route.ts"),
+  ]);
+
+  assert.doesNotMatch(board, /localStorage|loadJobs|workly-jobs/);
+  assert.match(board, /fetch\("\/api\/jobs", \{ cache: "no-store" \}\)/);
+  assert.doesNotMatch(admin, /localStorage|saveJobs|workly-jobs/);
+  assert.match(serverJobs, /process\.env\.DATABASE_URL/);
+  assert.match(serverJobs, /CREATE TABLE IF NOT EXISTS jobs/);
+  assert.match(api, /export async function POST/);
+  assert.match(api, /export async function PATCH/);
+  assert.match(api, /export async function DELETE/);
 });
 
 test("contains the CMS and finished social metadata", async () => {
