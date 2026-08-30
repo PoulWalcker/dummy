@@ -19,13 +19,20 @@ test("contains the public Shady Jobs experience", async () => {
 });
 
 test("keeps all filters synchronized with query parameters", async () => {
-  const board = await readProjectFile("app/JobBoard.tsx");
+  const [board, page] = await Promise.all([
+    readProjectFile("app/JobBoard.tsx"),
+    readProjectFile("app/page.tsx"),
+  ]);
 
   for (const parameter of ["q", "salary_from", "salary_to", "location", "role", "type"]) {
     assert.match(board, new RegExp(`params\\.get\\(\\"${parameter}\\"\\)`));
     assert.match(board, new RegExp(`syncParam\\(\\"${parameter}\\"`));
   }
   assert.match(board, /window\.history\.replaceState/);
+  assert.match(page, /await searchParams/);
+  assert.match(page, /filterJobs\(DEFAULT_JOBS, initialFilters\)/);
+  assert.match(page, /params\.salary_from/);
+  assert.match(page, /params\.salary_to/);
 });
 
 test("contains the CMS and finished social metadata", async () => {

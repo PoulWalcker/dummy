@@ -2,16 +2,27 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { SiteHeader } from "./components/SiteHeader";
-import { DEFAULT_JOBS, JOBS_STORAGE_KEY, Job, loadJobs } from "./data/jobs";
+import {
+  JOBS_STORAGE_KEY,
+  Job,
+  JobFilters,
+  filterJobs,
+  loadJobs,
+} from "./data/jobs";
 
-export function JobBoard() {
-  const [jobs, setJobs] = useState<Job[]>(DEFAULT_JOBS);
-  const [query, setQuery] = useState("");
-  const [location, setLocation] = useState("All locations");
-  const [role, setRole] = useState("All roles");
-  const [type, setType] = useState("All types");
-  const [salaryFrom, setSalaryFrom] = useState("");
-  const [salaryTo, setSalaryTo] = useState("");
+type JobBoardProps = {
+  initialJobs: Job[];
+  initialFilters: JobFilters;
+};
+
+export function JobBoard({ initialJobs, initialFilters }: JobBoardProps) {
+  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const [query, setQuery] = useState(initialFilters.query);
+  const [location, setLocation] = useState(initialFilters.location);
+  const [role, setRole] = useState(initialFilters.role);
+  const [type, setType] = useState(initialFilters.type);
+  const [salaryFrom, setSalaryFrom] = useState(initialFilters.salaryFrom);
+  const [salaryTo, setSalaryTo] = useState(initialFilters.salaryTo);
   const [urlReady, setUrlReady] = useState(false);
 
   useEffect(() => {
@@ -95,25 +106,7 @@ export function JobBoard() {
   );
 
   const filteredJobs = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const minimumSalary = salaryFrom === "" ? null : Number(salaryFrom);
-    const maximumSalary = salaryTo === "" ? null : Number(salaryTo);
-
-    return jobs.filter((job) => {
-      const searchable = `${job.title} ${job.company} ${job.description}`.toLowerCase();
-      const salaryNumbers = Array.from(job.salary.matchAll(/\d+(?:\.\d+)?/g), (match) => Number(match[0]));
-      const jobSalaryFrom = salaryNumbers[0] ?? 0;
-      const jobSalaryTo = salaryNumbers[1] ?? jobSalaryFrom;
-
-      return (
-        (!normalizedQuery || searchable.includes(normalizedQuery)) &&
-        (location === "All locations" || job.location.toLowerCase().includes(location.toLowerCase())) &&
-        (role === "All roles" || job.title.toLowerCase() === role.toLowerCase()) &&
-        (type === "All types" || job.type.toLowerCase() === type.toLowerCase()) &&
-        (minimumSalary === null || Number.isNaN(minimumSalary) || jobSalaryTo >= minimumSalary) &&
-        (maximumSalary === null || Number.isNaN(maximumSalary) || jobSalaryFrom <= maximumSalary)
-      );
-    });
+    return filterJobs(jobs, { query, location, role, type, salaryFrom, salaryTo });
   }, [jobs, location, query, role, salaryFrom, salaryTo, type]);
 
   function handleSearch(event: FormEvent) {

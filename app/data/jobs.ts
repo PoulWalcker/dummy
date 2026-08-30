@@ -8,6 +8,24 @@ export type Job = {
   type: string;
 };
 
+export type JobFilters = {
+  query: string;
+  salaryFrom: string;
+  salaryTo: string;
+  location: string;
+  role: string;
+  type: string;
+};
+
+export const EMPTY_JOB_FILTERS: JobFilters = {
+  query: "",
+  salaryFrom: "",
+  salaryTo: "",
+  location: "All locations",
+  role: "All roles",
+  type: "All types",
+};
+
 export const JOBS_STORAGE_KEY = "workly-jobs";
 const SEED_VERSION_KEY = "shady-jobs-seed-version";
 const CURRENT_SEED_VERSION = "2";
@@ -140,4 +158,27 @@ export function loadJobs(): Job[] {
 
 export function saveJobs(jobs: Job[]) {
   window.localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
+}
+
+export function filterJobs(jobs: Job[], filters: JobFilters): Job[] {
+  const normalizedQuery = filters.query.trim().toLowerCase();
+  const minimumSalary = filters.salaryFrom === "" ? null : Number(filters.salaryFrom);
+  const maximumSalary = filters.salaryTo === "" ? null : Number(filters.salaryTo);
+
+  return jobs.filter((job) => {
+    const searchable = `${job.title} ${job.company} ${job.description}`.toLowerCase();
+    const salaryNumbers = Array.from(job.salary.matchAll(/\d+(?:\.\d+)?/g), (match) => Number(match[0]));
+    const jobSalaryFrom = salaryNumbers[0] ?? 0;
+    const jobSalaryTo = salaryNumbers[1] ?? jobSalaryFrom;
+
+    return (
+      (!normalizedQuery || searchable.includes(normalizedQuery)) &&
+      (filters.location === "All locations" ||
+        job.location.toLowerCase().includes(filters.location.toLowerCase())) &&
+      (filters.role === "All roles" || job.title.toLowerCase() === filters.role.toLowerCase()) &&
+      (filters.type === "All types" || job.type.toLowerCase() === filters.type.toLowerCase()) &&
+      (minimumSalary === null || Number.isNaN(minimumSalary) || jobSalaryTo >= minimumSalary) &&
+      (maximumSalary === null || Number.isNaN(maximumSalary) || jobSalaryFrom <= maximumSalary)
+    );
+  });
 }
