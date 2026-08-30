@@ -71,6 +71,7 @@ test("uses the shared database instead of browser storage", async () => {
   assert.match(board, /fetch\("\/api\/jobs", \{ cache: "no-store" \}\)/);
   assert.doesNotMatch(admin, /localStorage|saveJobs|workly-jobs/);
   assert.match(serverJobs, /process\.env\.DATABASE_URL/);
+  assert.match(serverJobs, /process\.env\.POSTGRES_URL/);
   assert.match(serverJobs, /CREATE TABLE IF NOT EXISTS jobs/);
   assert.match(api, /export async function POST/);
   assert.match(api, /export async function PATCH/);
